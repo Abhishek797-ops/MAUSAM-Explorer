@@ -1,83 +1,106 @@
-# 🌐 MAUSAM Explorer
+# 🌍 MAUSAM Explorer
 ### Interactive Climate Data Visualization Dashboard
-**Technex '26 — Hack It Out Hackathon | Team ONLY BANS | IIT BHU Varanasi**
 
----
 
-## 🚀 Quick Start
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Launch the dashboard
-streamlit run app.py
-```
-
-The app will open in your browser at `http://localhost:8501`.
+MAUSAM Explorer is a modern, full-stack web application designed for processing, visualizing, and analyzing heavy climate datasets (like ERA5 NetCDF files) through an immersive 3D WebGL interface.
 
 ---
 
 ## ✨ Features
 
-| Feature | Status |
-|---------|--------|
-| NetCDF file upload (.nc) | ✅ |
-| Auto-generated demo dataset (1990–2024) | ✅ |
-| Global 2D heatmap (scatter_geo) | ✅ |
-| 3D orthographic globe visualization | ✅ |
-| Time-series analysis with anomaly detection | ✅ |
-| Year-over-year comparison mode | ✅ |
-| Guided climate story tour (4 events) | ✅ |
-| Live statistics HUD panel | ✅ |
-| Dark space theme with circuit decorations | ✅ |
-| Multiple color scale options | ✅ |
+- **Interactive 3D WebGL Globe**: Photorealistic rotating Earth with smooth, server-generated heatmap data overlays.
+- **Data Explorer**: Pagination-supported raw data grid to inspect thousands of coordinate values instantly.
+- **Time-Series Analysis**: Dynamic line, bar, and anomaly charts powered by Plotly for historical trend analysis.
+- **Location Inspector**: Click anywhere on the globe to extract historical statistics and 5-year averages for that specific lat/lon.
+- **High-Performance Backend**: FastAPI and `xarray` process heavy `.nc` files in memory, delivering sub-second API responses.
+- **Automated Data Pipeline**: Includes `download_era5.py` to seamlessly fetch decades of climate data from the Copernicus API limit-free.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Framework**: Streamlit
-- **Data**: xarray, pandas, numpy, netCDF4
-- **Visualization**: Plotly, Matplotlib
-- **Statistics**: SciPy (anomaly detection, trend analysis)
-- **3D Globe**: Plotly orthographic projection
-- **Styling**: Custom CSS (Orbitron + Exo 2 fonts, dark HUD theme)
+### Frontend (User Interface)
+- **Framework**: React 18 (Vite)
+- **3D Rendering**: `three`, `react-three-fiber`, `react-globe.gl`
+- **Charting**: `plotly.js-dist-min` (Optimized factory wrapper)
+- **Styling**: Tailwind CSS + Framer Motion for cinematic animations
+- **Icons**: Lucide React
+
+### Backend (Data Engine)
+- **Framework**: FastAPI (Python)
+- **Data Processing**: `xarray`, `numpy`, `pandas`, `netCDF4`
+- **Visualization Engine**: `matplotlib` (for smooth equirectangular texture generation)
+- **Server**: Uvicorn
+
+---
+
+## 🚀 Quick Start Guide
+
+### 1. Backend Setup (FastAPI)
+Open a terminal in the project root folder:
+```bash
+# Create and activate a virtual environment
+python -m venv venv
+venv\Scripts\activate  # On Windows
+
+# Install Python dependencies
+pip install -r requirements.txt
+pip install matplotlib scipy
+
+# Start the FastAPI server
+python -m uvicorn main:app --port 8000 --reload
+```
+*The backend API will run on `http://localhost:8000`*
+
+### 2. Frontend Setup (React)
+Open a new terminal in the `frontend/` directory:
+```bash
+cd frontend
+
+# Install Node dependencies
+npm install
+
+# Start the Vite development server
+npm run dev
+```
+*The dashboard will open in your browser at `http://localhost:5173`*
 
 ---
 
 ## 📁 Project Structure
 
 ```
-MAUSAM/
-├── app.py                       # Main Streamlit dashboard
-├── requirements.txt             # Python dependencies
-├── README.md                    # This file
-├── data/                        # Place .nc files here
-├── assets/
-│   └── custom.css               # Dark space theme CSS
-├── components/
-│   ├── heatmap.py               # 2D spatial heatmap
-│   ├── timeseries.py            # Time-series with anomaly highlighting
-│   ├── globe_3d.py              # 3D globe visualization
-│   ├── comparison.py            # Year-over-year comparison
-│   ├── story_mode.py            # Guided climate tour
-│   └── stats_panel.py           # Live statistics panel
+MAUSAM-Explorer/
+├── main.py                      # FastAPI server & endpoints
+├── download_era5.py             # Copernicus ERA5 API downloader script
+├── requirements.txt             # Backend dependencies
+├── frontend/                    # React Web Application
+│   ├── package.json             # Frontend dependencies
+│   ├── vite.config.js           # Vite configuration (optimized for 3D)
+│   └── src/
+│       ├── App.jsx              # Main Dashboard Shell (Tab Navigation)
+│       ├── api/client.js        # Axios API client wrapper
+│       └── components/          # Dashboard Tabs
+│           ├── LandingPage.jsx  # Cinematic 3D entry page
+│           ├── ClimateProfile.jsx
+│           ├── TimeSeriesTab.jsx
+│           ├── DataExplorer.jsx
+│           └── LocationAnalysis.jsx
 └── utils/
-    ├── data_loader.py           # NetCDF loader + demo data generator
-    ├── anomaly_detector.py      # Statistical anomaly detection
-    └── theme.py                 # CSS injection + Plotly theme
+    └── data_loader.py           # NetCDF parsing and caching
 ```
 
 ---
 
-## 📊 Data Sources
+## 📊 Getting Climate Data
 
-- **ERA5 Reanalysis**: Download from [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/)
-- **Demo Mode**: If no file is uploaded, the app generates a synthetic global temperature + precipitation dataset (1990–2024, 2.5° resolution) for demonstration.
+The application requires `.nc` (NetCDF) datasets to function. 
+
+You can download global ERA5 climate data natively using the included downloader script:
+```bash
+venv\Scripts\python download_era5.py
+```
+*This requires a valid `~/.cdsapirc` file configured with your Copernicus CDS API key.*
 
 ---
 
-## 👥 Team
-
-**Team ONLY BANS** — Built at IIT(BHU) Varanasi for Technex '26 Hack It Out.
