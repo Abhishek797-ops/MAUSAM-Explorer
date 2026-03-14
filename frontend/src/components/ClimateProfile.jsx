@@ -1,23 +1,28 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Globe from 'react-globe.gl';
 import * as THREE from 'three';
-import { Thermometer, Droplets, Wind } from 'lucide-react';
+import { Thermometer, Droplets, Wind, MapPin, X } from 'lucide-react';
 
 export default function ClimateProfile({ spatialData, meta, variable, onVariableChange, loading }) {
   const globeEl = useRef();
   const [activeLayer, setActiveLayer] = useState('temperature');
   const [heatmapMesh, setHeatmapMesh] = useState(null);
+  
+  // Interactive Location State
+  const [clickedLocation, setClickedLocation] = useState(null);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
 
   useEffect(() => {
     if (!globeEl.current) return;
     const controls = globeEl.current.controls();
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.3;
+    if (controls) {
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 0.4;
+    }
   }, []);
 
   const heatmapUrl = useMemo(() => {
     if (variable && spatialData) {
-       // Ensure we grab fresh image when spatialData updates
        return `/api/heatmap?variable=${variable}&time_index=${spatialData?.meta?.timeIndex || 0}&t=${Date.now()}`;
     }
     return null;
@@ -28,21 +33,18 @@ export default function ClimateProfile({ spatialData, meta, variable, onVariable
 
     const loader = new THREE.TextureLoader();
     loader.load(heatmapUrl, (texture) => {
-      // react-globe.gl uses a radius of 100 for the earth
       const geometry = new THREE.SphereGeometry(100 * 1.002, 64, 64);
       const material = new THREE.MeshPhongMaterial({
         map: texture,
         transparent: true,
-        depthWrite: false, // Ensures it doesn't z-fight with the base globe
+        depthWrite: false,
         blending: THREE.NormalBlending
       });
       
       const mesh = new THREE.Mesh(geometry, material);
-      // three-globe rotates the earth by -PI/2 so the PM matches the texture
       mesh.rotation.y = -Math.PI / 2;
 
       setHeatmapMesh((prevMesh) => {
-        // Discard old geometry/material completely to avoid memory leaks
         if (prevMesh) {
            prevMesh.geometry.dispose();
            prevMesh.material.dispose();
@@ -59,9 +61,71 @@ export default function ClimateProfile({ spatialData, meta, variable, onVariable
 
     return () => {
       scene.remove(heatmapMesh);
-      // Wait to dispose until replaced to prevent popping, but cleanup on unmount
     };
   }, [heatmapMesh]);
+
+  const MAJOR_CITIES = [
+    { name: 'New York', lat: 40.71, lng: -74.00, size: 0.5 },
+    { name: 'London', lat: 51.50, lng: -0.12, size: 0.5 },
+    { name: 'Tokyo', lat: 35.67, lng: 139.65, size: 0.5 },
+    { name: 'Sydney', lat: -33.86, lng: 151.20, size: 0.5 },
+    { name: 'Mumbai', lat: 19.07, lng: 72.87, size: 0.5 },
+    { name: 'Cairo', lat: 30.04, lng: 31.23, size: 0.5 },
+    { name: 'São Paulo', lat: -23.55, lng: -46.63, size: 0.5 },
+    { name: 'Moscow', lat: 55.75, lng: 37.61, size: 0.5 },
+    { name: 'Beijing', lat: 39.90, lng: 116.40, size: 0.5 },
+    { name: 'Paris', lat: 48.85, lng: 2.35, size: 0.5 },
+    { name: 'Johannesburg', lat: -26.20, lng: 28.04, size: 0.5 },
+    { name: 'Los Angeles', lat: 34.05, lng: -118.24, size: 0.5 },
+    { name: 'Dubai', lat: 25.20, lng: 55.27, size: 0.5 },
+    { name: 'Singapore', lat: 1.35, lng: 103.81, size: 0.5 }
+  ];
+
+  const handleGlobeClick = async ({ lat, lng }) => {
+    if (!spatialData?.data) return;
+    setClickedLocation(null);
+    setIsFetchingLocation(true);
+
+    // 1. Find the nearest spatial data point for the exact climate value
+    const nearest = spatialData.data.reduce((prev, curr) => {
+      const prevDist = Math.pow(prev.lat - lat, 2) + Math.pow(prev.lon - lng, 2);
+      const currDist = Math.pow(curr.lat - lat, 2) + Math.pow(curr.lon - lng, 2);
+      return prevDist < currDist ? prev : curr;
+    });
+
+    // 2. Reverse geocode the coordinate using OpenStreetMap
+    let placeName = "Unknown Location";
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10`, {
+        headers: { 'User-Agent': 'MAUSAM-Explorer/1.0' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const address = data.address || {};
+        const localArea = address.city || address.town || address.village || address.hamlet || address.county;
+        const region = address.state || address.country;
+        
+        if (localArea && region && localArea !== region) {
+          placeName = `${localArea}, ${region}`;
+        } else if (localArea || region) {
+          placeName = localArea || region;
+        } else {
+          placeName = "Ocean / Remote Area";
+        }
+      }
+    } catch (e) {
+      console.warn("Geocoding failed", e);
+    }
+
+    setClickedLocation({
+      lat: lat.toFixed(2),
+      lon: lng.toFixed(2),
+      name: placeName,
+      value: nearest.value,
+      units: spatialData.meta.units
+    });
+    setIsFetchingLocation(false);
+  };
 
   const layers = [
     { id: 'temperature', label: 'Temperature Layers', icon: <Thermometer size={14} /> },
@@ -103,31 +167,104 @@ export default function ClimateProfile({ spatialData, meta, variable, onVariable
         atmosphereColor="#4a90d9"
         atmosphereAltitude={0.15}
         animateIn={true}
+        onGlobeClick={handleGlobeClick}
+        labelsData={MAJOR_CITIES}
+        labelLat="lat"
+        labelLng="lng"
+        labelText="name"
+        labelSize={1.5}
+        labelDotRadius={0.4}
+        labelColor={() => 'rgba(255,255,255,0.7)'}
+        labelResolution={2}
+        htmlElementsData={clickedLocation ? [clickedLocation] : []}
+        htmlLat="lat"
+        htmlLng="lon"
+        htmlElement={() => {
+          const el = document.createElement('div');
+          el.innerHTML = `<div class="w-4 h-4 rounded-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)] border-2 border-white animate-bounce flex items-center justify-center -translate-y-2"></div>`;
+          return el;
+        }}
       />
 
       {/* Stats Overlay */}
-      {spatialData && (
-        <div className="absolute top-4 right-4 z-20 space-y-3">
-          <StatBadge label="Mean" value={
-            (spatialData.data.reduce((a, b) => a + b.value, 0) / spatialData.data.length).toFixed(2)
-          } units={spatialData.meta.units} />
-          <StatBadge label="Max" value={spatialData.meta.max.toFixed(2)} units={spatialData.meta.units} color="text-red-400" />
-          <StatBadge label="Min" value={spatialData.meta.min.toFixed(2)} units={spatialData.meta.units} color="text-cyan-400" />
-          <StatBadge label="Points" value={spatialData.data.length.toLocaleString()} units="PTS" color="text-indigo-400" />
-        </div>
-      )}
+      {spatialData && (() => {
+        const isKelvin = spatialData.meta.units === 'K' || spatialData.meta.units === 'Kelvin';
+        const offset = isKelvin ? 273.15 : 0;
+        const displayUnits = isKelvin ? '°C' : spatialData.meta.units;
+        const meanObj = spatialData.data.reduce((a, b) => a + b.value, 0) / spatialData.data.length;
+
+        return (
+          <div className="absolute top-4 right-4 z-20 space-y-3">
+            <StatBadge label="Mean" value={(meanObj - offset).toFixed(2)} units={displayUnits} />
+            <StatBadge label="Max" value={(spatialData.meta.max - offset).toFixed(2)} units={displayUnits} color="text-red-400" />
+            <StatBadge label="Min" value={(spatialData.meta.min - offset).toFixed(2)} units={displayUnits} color="text-cyan-400" />
+            <StatBadge label="Points" value={spatialData.data.length.toLocaleString()} units="PTS" color="text-indigo-400" />
+          </div>
+        );
+      })()}
 
       {/* Color Legend */}
-      {spatialData && (
-        <div className="absolute bottom-6 right-6 z-20 bg-black/60 backdrop-blur-xl p-4 rounded-2xl border border-white/10 flex flex-col items-end">
-          <div className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-2 text-right">Intensity</div>
-          <div className="flex gap-3">
-            <div className="flex flex-col justify-between items-end h-32">
-              <span className="text-[10px] text-white/70 font-bold">{spatialData.meta.max.toFixed(1)}</span>
-              <span className="text-[10px] text-white/70 font-bold">{spatialData.meta.min.toFixed(1)}</span>
+      {spatialData && (() => {
+        const isKelvin = spatialData.meta.units === 'K' || spatialData.meta.units === 'Kelvin';
+        const offset = isKelvin ? 273.15 : 0;
+        
+        return (
+          <div className="absolute bottom-6 right-6 z-20 bg-black/60 backdrop-blur-xl p-4 rounded-2xl border border-white/10 flex flex-col items-end">
+            <div className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-2 text-right">Intensity</div>
+            <div className="flex gap-3">
+              <div className="flex flex-col justify-between items-end h-32">
+                <span className="text-[10px] text-white/70 font-bold">{(spatialData.meta.max - offset).toFixed(1)}</span>
+                <span className="text-[10px] text-white/70 font-bold">{(spatialData.meta.min - offset).toFixed(1)}</span>
+              </div>
+              <div className="h-32 w-3 bg-gradient-to-t from-blue-600 via-yellow-400 to-red-500 rounded-full shadow-inner"></div>
             </div>
-            <div className="h-32 w-3 bg-gradient-to-t from-blue-600 via-yellow-400 to-red-500 rounded-full shadow-inner"></div>
           </div>
+        );
+      })()}
+
+      {/* Interactive Location Popup */}
+      {(clickedLocation || isFetchingLocation) && (
+        <div className="absolute bottom-6 left-6 z-20 bg-black/80 backdrop-blur-2xl p-5 rounded-2xl border border-blue-500/30 shadow-[0_0_30px_rgba(59,130,246,0.15)] w-72 animate-in slide-in-from-bottom-5">
+          <button 
+            onClick={() => setClickedLocation(null)}
+            className="absolute top-3 right-3 p-1 hover:bg-white/10 rounded-lg text-white/40 transition-colors"
+          >
+            <X size={14} />
+          </button>
+          
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-4 flex items-center gap-1.5">
+            <MapPin size={12} /> Point Inspection
+          </h3>
+          
+          {isFetchingLocation ? (
+            <div className="flex items-center gap-3 py-2">
+              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs font-bold text-white/60 font-outfit">Triangulating...</span>
+            </div>
+          ) : clickedLocation && (
+            <div className="space-y-4">
+              <div>
+                <div className="text-xl font-black text-white font-outfit leading-tight break-words">
+                  {clickedLocation.name}
+                </div>
+                <div className="text-[10px] font-mono text-white/40 mt-1">
+                  {clickedLocation.lat}°N, {clickedLocation.lon}°E
+                </div>
+              </div>
+              
+              <div className="bg-white/5 p-3 rounded-xl border border-white/5 flex items-center justify-between">
+                <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">Reading</span>
+                <div className="text-lg font-black text-white font-outfit">
+                  {clickedLocation.units === 'K' || clickedLocation.units === 'Kelvin' 
+                    ? (clickedLocation.value - 273.15).toFixed(2) 
+                    : clickedLocation.value.toFixed(2)}
+                  <span className="text-[10px] text-white/30 ml-1">
+                    {clickedLocation.units === 'K' || clickedLocation.units === 'Kelvin' ? '°C' : clickedLocation.units}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

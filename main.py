@@ -98,6 +98,7 @@ async def upload_dataset(file: UploadFile = File(...)):
     
     upload_path = f"data/{file.filename}"
     try:
+        os.makedirs(os.path.dirname(upload_path), exist_ok=True)
         with open(upload_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
