@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Plot from './PlotlyChart';
+import ComparisonView from './ComparisonView';
+import YearComparisonView from './YearComparisonView';
 import { getStats } from '../api/client';
-import { TrendingUp, BarChart3, Activity } from 'lucide-react';
+import { TrendingUp, BarChart3, Activity, GitCompareArrows, CalendarRange } from 'lucide-react';
 
-export default function TimeSeriesTab({ meta, variable }) {
+export default function TimeSeriesTab({ meta, variable, timeRange }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [chartType, setChartType] = useState('line');
@@ -25,9 +27,12 @@ export default function TimeSeriesTab({ meta, variable }) {
     );
   }
 
+  const slicedTimes = stats.times.slice(timeRange[0], timeRange[1] + 1);
+  const slicedMeans = stats.time_means.slice(timeRange[0], timeRange[1] + 1);
+
   const lineTrace = {
-    x: stats.times,
-    y: stats.time_means,
+    x: slicedTimes,
+    y: slicedMeans,
     type: 'scatter',
     mode: 'lines',
     name: `${stats.long_name} (Global Mean)`,
@@ -37,12 +42,12 @@ export default function TimeSeriesTab({ meta, variable }) {
   };
 
   const barTrace = {
-    x: stats.times,
-    y: stats.time_means,
+    x: slicedTimes,
+    y: slicedMeans,
     type: 'bar',
     name: `${stats.long_name}`,
     marker: {
-      color: stats.time_means.map(v => {
+      color: slicedMeans.map(v => {
         const t = (v - stats.global_min) / (stats.global_max - stats.global_min);
         return `rgba(${Math.round(t * 255)}, ${Math.round((1 - t) * 120 + 80)}, ${Math.round((1 - t) * 255)}, 0.85)`;
       })
@@ -51,12 +56,12 @@ export default function TimeSeriesTab({ meta, variable }) {
 
   // Compute anomalies (deviation from global mean)
   const anomalyTrace = {
-    x: stats.times,
-    y: stats.time_means.map(v => v !== null ? +(v - stats.global_mean).toFixed(3) : null),
+    x: slicedTimes,
+    y: slicedMeans.map(v => v !== null ? +(v - stats.global_mean).toFixed(3) : null),
     type: 'bar',
     name: 'Anomaly',
     marker: {
-      color: stats.time_means.map(v => v !== null && v > stats.global_mean ? 'rgba(239,68,68,0.7)' : 'rgba(59,130,246,0.7)')
+      color: slicedMeans.map(v => v !== null && v > stats.global_mean ? 'rgba(239,68,68,0.7)' : 'rgba(59,130,246,0.7)')
     },
   };
 
@@ -94,6 +99,8 @@ export default function TimeSeriesTab({ meta, variable }) {
             { id: 'line', icon: <TrendingUp size={14} />, label: 'Trend' },
             { id: 'bar', icon: <BarChart3 size={14} />, label: 'Distribution' },
             { id: 'anomaly', icon: <Activity size={14} />, label: 'Anomaly' },
+            { id: 'compare', icon: <GitCompareArrows size={14} />, label: 'Compare' },
+            { id: 'yearcompare', icon: <CalendarRange size={14} />, label: 'Year Compare' },
           ].map(opt => (
             <button
               key={opt.id}
@@ -110,25 +117,34 @@ export default function TimeSeriesTab({ meta, variable }) {
         </div>
       </div>
 
-      {/* Main Chart */}
-      <div className="flex-1 p-4">
-        <Plot
-          data={traces}
-          layout={layout}
-          config={{ responsive: true, displayModeBar: false }}
-          style={{ width: '100%', height: '100%' }}
-          useResizeHandler={true}
-        />
-      </div>
+      {/* Main Content */}
+      {chartType === 'compare' ? (
+        <ComparisonView meta={meta} timeRange={timeRange} />
+      ) : chartType === 'yearcompare' ? (
+        <YearComparisonView meta={meta} variable={variable} />
+      ) : (
+        <>
+          {/* Main Chart */}
+          <div className="flex-1 p-4">
+            <Plot
+              data={traces}
+              layout={layout}
+              config={{ responsive: true, displayModeBar: false }}
+              style={{ width: '100%', height: '100%' }}
+              useResizeHandler={true}
+            />
+          </div>
 
-      {/* Summary Stats Footer */}
-      <div className="flex gap-4 px-6 py-4 border-t border-white/5">
-        <FooterStat label="Global Mean" value={stats.global_mean} units={stats.units} />
-        <FooterStat label="Global Max" value={stats.global_max} units={stats.units} color="text-red-400" />
-        <FooterStat label="Global Min" value={stats.global_min} units={stats.units} color="text-cyan-400" />
-        <FooterStat label="Std Dev" value={stats.global_std} units={stats.units} color="text-amber-400" />
-        <FooterStat label="Data Points" value={stats.total_points.toLocaleString()} units="" color="text-indigo-400" />
-      </div>
+          {/* Summary Stats Footer */}
+          <div className="flex gap-4 px-6 py-4 border-t border-white/5">
+            <FooterStat label="Global Mean" value={stats.global_mean} units={stats.units} />
+            <FooterStat label="Global Max" value={stats.global_max} units={stats.units} color="text-red-400" />
+            <FooterStat label="Global Min" value={stats.global_min} units={stats.units} color="text-cyan-400" />
+            <FooterStat label="Std Dev" value={stats.global_std} units={stats.units} color="text-amber-400" />
+            <FooterStat label="Data Points" value={stats.total_points.toLocaleString()} units="" color="text-indigo-400" />
+          </div>
+        </>
+      )}
     </div>
   );
 }

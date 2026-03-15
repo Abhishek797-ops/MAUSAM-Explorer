@@ -1,106 +1,105 @@
-# 🌍 MAUSAM Explorer
-### Interactive Climate Data Visualization Dashboard
+# MAUSAM Explorer
 
+MAUSAM (Meteorological Analysis & Universal Spatial Anomaly Mapper) Explorer is a high-performance, full-stack climate data visualization dashboard. It allows researchers, students, and enthusiasts to natively load, explore, and compare multi-decadal global climate datasets in real-time directly from `.nc` (NetCDF) files.
 
-MAUSAM Explorer is a modern, full-stack web application designed for processing, visualizing, and analyzing heavy climate datasets (like ERA5 NetCDF files) through an immersive 3D WebGL interface.
+Features a custom-built 1990–2024 High-Fidelity Synthetic Climate Generator for immediate exploration without needing to download massive raw datasets.
+
+![MAUSAM Explorer](https://github.com/user-attachments/assets/placeholder-image) <!-- Add a screenshot here -->
+
+## ✨ Key Features
+
+### 🌍 3D Global Heatmaps & Interactive Tours
+- **WebGL-powered 3D Globe**: Render global temperature (`t2m`) and precipitation (`tp`) patterns dynamically on an interactive Earth.
+- **Story Mode**: Automatically calculates historical climate anomalies (e.g., El Niño 1997, Heatwave 2003) and takes users on a guided, animated tour.
+
+### 📊 Advanced Time-Series Analysis
+- **Year-over-Year Comparison**: Select any location to view an overlaid, multi-year comparison chart (up to 5 years simultaneously) to easily spot climate shifts.
+- **Statistical Summaries**: Global means, minimums, maximums, and standard deviations tracked at every time step.
+- **Real-time Anomaly Detection**: Distribution thresholds dynamically highlight anomalous months.
+
+### 🛠️ "Explore" Mode (1990–2024)
+Don't have a NetCDF file? Click **EXPLORE** to immediately visualize a high-fidelity synthetic climate model covering 420 months (1990–2024). 
+- Calibrated using real-world baseline anomalies.
+- accurately simulates latitudinal gradients, seasonal cycles (June monsoons, January freezes), and observed multidecadal global warming trends.
+
+### 📂 In-Browser NetCDF Processing
+- Parse massive scientific NetCDF (.nc) files purely through a localized Python FastAPI backend (using `xarray`), with seamless chunking to the React frontend.
+- Zero-latency dataset switching via the sidebar.
 
 ---
 
-## ✨ Features
+## 🚀 Getting Started
 
-- **Interactive 3D WebGL Globe**: Photorealistic rotating Earth with smooth, server-generated heatmap data overlays.
-- **Data Explorer**: Pagination-supported raw data grid to inspect thousands of coordinate values instantly.
-- **Time-Series Analysis**: Dynamic line, bar, and anomaly charts powered by Plotly for historical trend analysis.
-- **Location Inspector**: Click anywhere on the globe to extract historical statistics and 5-year averages for that specific lat/lon.
-- **High-Performance Backend**: FastAPI and `xarray` process heavy `.nc` files in memory, delivering sub-second API responses.
-- **Automated Data Pipeline**: Includes `download_era5.py` to seamlessly fetch decades of climate data from the Copernicus API limit-free.
+### Prerequisites
+- [Node.js](https://nodejs.org/) (v18+)
+- [Python 3.10+](https://www.python.org/)
+- Make sure `pip` is installed.
+
+### 1. Backend Setup (FastAPI + xarray)
+Navigate to the project root directory and set up a Python virtual environment:
+```bash
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+
+# Install requirements
+pip install fastapi uvicorn xarray numpy netCDF4 pandas pydantic typing-extensions 'matplotlib<3.9.0'
+```
+
+Start the backend server:
+```bash
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+*The backend will be running at `http://localhost:8000`*
+
+### 2. Frontend Setup (React + Vite + Tailwind)
+Open a new terminal, navigate to the `frontend` directory:
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start the dev server
+npm run dev
+```
+
+*The frontend will be running at `http://localhost:5173`*
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Frontend (User Interface)
-- **Framework**: React 18 (Vite)
-- **3D Rendering**: `three`, `react-three-fiber`, `react-globe.gl`
-- **Charting**: `plotly.js-dist-min` (Optimized factory wrapper)
-- **Styling**: Tailwind CSS + Framer Motion for cinematic animations
-- **Icons**: Lucide React
+**Frontend:**
+- React (Vite)
+- Tailwind CSS
+- Plotly.js (Data Visualization)
+- react-globe.gl & Three.js (3D Spatial Mapping)
+- Lucide Icons
 
-### Backend (Data Engine)
-- **Framework**: FastAPI (Python)
-- **Data Processing**: `xarray`, `numpy`, `pandas`, `netCDF4`
-- **Visualization Engine**: `matplotlib` (for smooth equirectangular texture generation)
-- **Server**: Uvicorn
-
----
-
-## 🚀 Quick Start Guide
-
-### 1. Backend Setup (FastAPI)
-Open a terminal in the project root folder:
-```bash
-# Create and activate a virtual environment
-python -m venv venv
-venv\Scripts\activate  # On Windows
-
-# Install Python dependencies
-pip install -r requirements.txt
-pip install matplotlib scipy
-
-# Start the FastAPI server
-python -m uvicorn main:app --port 8000 --reload
-```
-*The backend API will run on `http://localhost:8000`*
-
-### 2. Frontend Setup (React)
-Open a new terminal in the `frontend/` directory:
-```bash
-cd frontend
-
-# Install Node dependencies
-npm install
-
-# Start the Vite development server
-npm run dev
-```
-*The dashboard will open in your browser at `http://localhost:5173`*
+**Backend:**
+- Python FastAPI
+- xarray & pandas (Scientific Data Processing)
+- netCDF4 (I/O)
+- Matplotlib (PNG Heatmap generation)
 
 ---
 
-## 📁 Project Structure
-
-```
-MAUSAM-Explorer/
-├── main.py                      # FastAPI server & endpoints
-├── download_era5.py             # Copernicus ERA5 API downloader script
-├── requirements.txt             # Backend dependencies
-├── frontend/                    # React Web Application
-│   ├── package.json             # Frontend dependencies
-│   ├── vite.config.js           # Vite configuration (optimized for 3D)
-│   └── src/
-│       ├── App.jsx              # Main Dashboard Shell (Tab Navigation)
-│       ├── api/client.js        # Axios API client wrapper
-│       └── components/          # Dashboard Tabs
-│           ├── LandingPage.jsx  # Cinematic 3D entry page
-│           ├── ClimateProfile.jsx
-│           ├── TimeSeriesTab.jsx
-│           ├── DataExplorer.jsx
-│           └── LocationAnalysis.jsx
-└── utils/
-    └── data_loader.py           # NetCDF parsing and caching
-```
+## 💡 How to Use
+1. Open `http://localhost:5173`.
+2. Click **EXPLORE** to use the built-in 1990-2024 climate model, OR select **Upload** to load your own `.nc` file.
+3. Use the **Variable** dropdown to switch between temperature and precipitation.
+4. Open the **Time-Series** tab -> **Year Compare** to analyze location-specific historical trends.
+5. Open the **Story Mode** tab to take an automated, animated tour of global historical anomalies.
 
 ---
 
-## 📊 Getting Climate Data
+## 🤝 Contributing
+Contributions, issues, and feature requests are welcome!
 
-The application requires `.nc` (NetCDF) datasets to function. 
-
-You can download global ERA5 climate data natively using the included downloader script:
-```bash
-venv\Scripts\python download_era5.py
-```
-*This requires a valid `~/.cdsapirc` file configured with your Copernicus CDS API key.*
-
----
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 

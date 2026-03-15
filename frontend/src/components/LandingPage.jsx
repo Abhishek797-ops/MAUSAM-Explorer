@@ -7,6 +7,7 @@ import GlobeVisual from './GlobeVisual';
 export default function LandingPage({ onUploadSuccess }) {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState(null);
 
   const handleFileChange = (e) => {
@@ -23,17 +24,29 @@ export default function LandingPage({ onUploadSuccess }) {
     if (!file) return;
 
     setUploading(true);
+    setUploadProgress(0);
     const formData = new FormData();
     formData.append("file", file);
 
     try {
       await axios.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 0, // No timeout for large files
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(percentCompleted);
+          }
+        }
       });
       onUploadSuccess();
     } catch (err) {
-      setError("Analysis failed. Dataset schema might be invalid.");
+      console.error(err);
+      setError("Analysis failed. Dataset schema might be invalid or file is too large.");
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -104,8 +117,17 @@ export default function LandingPage({ onUploadSuccess }) {
             >
               {uploading ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Analyzing...
+                  <div className="w-5 h-5 flex-shrink-0 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="flex-1 text-center pr-5">
+                    {uploadProgress < 100 ? `Uploading... ${uploadProgress}%` : 'Processing Dataset...'}
+                  </div>
+                  {/* Progress Bar Background */}
+                  <div className="absolute bottom-0 left-0 h-1 bg-white/20 w-full rounded-b-[24px] overflow-hidden">
+                    <div 
+                      className="h-full bg-white transition-all duration-300 ease-out"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
                 </>
               ) : (
                 <>
@@ -113,6 +135,24 @@ export default function LandingPage({ onUploadSuccess }) {
                   <ArrowRight size={18} />
                 </>
               )}
+            </button>
+
+            <button
+              onClick={async () => {
+                setUploading(true);
+                try {
+                  await axios.get('/api/explore');
+                  onUploadSuccess();
+                } catch (err) {
+                  setError("Failed to load sample data. Please try again.");
+                } finally {
+                  setUploading(false);
+                }
+              }}
+              disabled={uploading}
+              className={`w-full py-4 mt-4 rounded-[24px] font-black text-sm tracking-[0.2em] flex items-center justify-center gap-3 transition-all bg-transparent text-white/50 border border-white/10 hover:bg-white/5 hover:text-white ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              EXPLORE
             </button>
 
             <AnimatePresence>

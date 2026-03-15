@@ -9,9 +9,10 @@ export const getMetadata = async () => {
   return response.data;
 };
 
-export const getSpatialData = async (variable, timeIndex) => {
+export const getSpatialData = async (variable, timeRange) => {
+  const [startIdx, endIdx] = Array.isArray(timeRange) ? timeRange : [timeRange, timeRange];
   const response = await client.get('/spatial', {
-    params: { variable, time_index: timeIndex }
+    params: { variable, start_time_index: startIdx, end_time_index: endIdx }
   });
   return response.data;
 };

@@ -1,16 +1,80 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Globe from 'react-globe.gl';
 import * as THREE from 'three';
-import { Thermometer, Droplets, Wind, MapPin, X } from 'lucide-react';
+import { Thermometer, Droplets, Wind, MapPin, X, Gauge, Activity, Waves, Zap } from 'lucide-react';
 
-export default function ClimateProfile({ spatialData, meta, variable, onVariableChange, loading }) {
+// Pick a relevant icon based on variable name patterns
+function getVarIcon(varName) {
+  const n = varName.toLowerCase();
+  if (n.includes('t2m') || n.includes('temp') || n.includes('sst') || n.includes('tas')) return <Thermometer size={14} />;
+  if (n.includes('precip') || n.includes('rain') || n.includes('tp') || n.includes('pr')) return <Droplets size={14} />;
+  if (n.includes('press') || n.includes('sp') || n.includes('msl') || n.includes('ps')) return <Gauge size={14} />;
+  if (n.includes('wind') || n.includes('u10') || n.includes('v10') || n.includes('ua') || n.includes('va')) return <Wind size={14} />;
+  if (n.includes('humid') || n.includes('rh') || n.includes('q')) return <Waves size={14} />;
+  return <Activity size={14} />;
+}
+
+export default function ClimateProfile({ 
+  spatialData, 
+  meta, 
+  variable, 
+  timeRange, 
+  onVariableChange, 
+  loading,
+  isStoryMode,
+  setAppTimeIndex,
+  setAppActiveTab
+}) {
   const globeEl = useRef();
-  const [activeLayer, setActiveLayer] = useState('temperature');
+  const [activeLayer, setActiveLayer] = useState(variable || '');
   const [heatmapMesh, setHeatmapMesh] = useState(null);
   
   // Interactive Location State
   const [clickedLocation, setClickedLocation] = useState(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+
+  // Story Mode State
+  const [tourStops, setTourStops] = useState(null);
+  const [tourStepIdx, setTourStepIdx] = useState(0);
+  const [isTourLoading, setIsTourLoading] = useState(false);
+
+  // Auto-fetch Story Mode tour when activated
+  useEffect(() => {
+    if (isStoryMode && variable) {
+      setIsTourLoading(true);
+      fetch(`/api/tour?variable=${variable}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.stops?.length > 0) {
+            setTourStops(data.stops);
+            setTourStepIdx(0);
+            jumpToStop(data.stops[0]);
+          }
+        })
+        .finally(() => setIsTourLoading(false));
+    } else {
+      setTourStops(null);
+    }
+  }, [isStoryMode, variable]);
+
+  const jumpToStop = (stop) => {
+    if (!globeEl.current || !stop) return;
+    // Auto-disable autoRotate so it doesn't fight the user's tour view
+    const controls = globeEl.current.controls();
+    if (controls) controls.autoRotate = false;
+    
+    // Fly to the coordinate (altitude 1.2 is zoomed in)
+    globeEl.current.pointOfView({ lat: stop.lat, lng: stop.lon, altitude: 1.2 }, 1500);
+    // Update global time index
+    if (setAppTimeIndex) setAppTimeIndex(stop.time_index);
+  };
+
+
+
+  // Keep activeLayer in sync with the global variable prop
+  useEffect(() => {
+    if (variable) setActiveLayer(variable);
+  }, [variable]);
 
   useEffect(() => {
     if (!globeEl.current) return;
@@ -22,11 +86,13 @@ export default function ClimateProfile({ spatialData, meta, variable, onVariable
   }, []);
 
   const heatmapUrl = useMemo(() => {
-    if (variable && spatialData) {
-       return `/api/heatmap?variable=${variable}&time_index=${spatialData?.meta?.timeIndex || 0}&t=${Date.now()}`;
+    if (variable) {
+      const start = timeRange ? timeRange[0] : 0;
+      const end = timeRange ? timeRange[1] : 0;
+      return `/api/heatmap?variable=${variable}&start_time_index=${start}&end_time_index=${end}&t=${Date.now()}`;
     }
     return null;
-  }, [variable, spatialData]);
+  }, [variable, timeRange]);
 
   useEffect(() => {
     if (!heatmapUrl) return;
@@ -54,14 +120,15 @@ export default function ClimateProfile({ spatialData, meta, variable, onVariable
     });
   }, [heatmapUrl]);
 
+  // Inject the custom heatmap mesh into the Globe scene
   useEffect(() => {
-    if (!globeEl.current || !heatmapMesh) return;
-    const scene = globeEl.current.scene();
-    scene.add(heatmapMesh);
-
-    return () => {
-      scene.remove(heatmapMesh);
-    };
+    if (globeEl.current && heatmapMesh) {
+      const scene = globeEl.current.scene();
+      scene.add(heatmapMesh);
+      return () => {
+        scene.remove(heatmapMesh);
+      };
+    }
   }, [heatmapMesh]);
 
   const MAJOR_CITIES = [
@@ -127,32 +194,24 @@ export default function ClimateProfile({ spatialData, meta, variable, onVariable
     setIsFetchingLocation(false);
   };
 
-  const layers = [
-    { id: 'temperature', label: 'Temperature Layers', icon: <Thermometer size={14} /> },
-    { id: 'precipitation', label: 'Precipitation Layers', icon: <Droplets size={14} /> },
-    { id: 'pressure', label: 'Pressure Layers', icon: <Wind size={14} /> },
-  ];
-
   return (
     <div className="w-full h-full relative bg-slate-900 overflow-hidden">
-      {/* Layer Toggles */}
-      <div className="absolute top-4 left-4 z-20 flex gap-2">
-        {layers.map(layer => (
+      {/* Dynamic Layer Toggles from dataset variables */}
+      <div className="absolute top-4 left-4 z-20 flex gap-2 flex-wrap">
+        {meta?.variables?.map(v => (
           <button
-            key={layer.id}
+            key={v}
             onClick={() => {
-              setActiveLayer(layer.id);
-              if (meta?.variables?.includes(layer.id)) {
-                onVariableChange(layer.id);
-              }
+              setActiveLayer(v);
+              onVariableChange(v);
             }}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeLayer === layer.id
+              activeLayer === v
                 ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
                 : 'bg-white/10 text-white/60 hover:bg-white/20 backdrop-blur-md'
             }`}
           >
-            {layer.icon} {layer.label}
+            {getVarIcon(v)} {v}
           </button>
         ))}
       </div>
@@ -176,6 +235,7 @@ export default function ClimateProfile({ spatialData, meta, variable, onVariable
         labelDotRadius={0.4}
         labelColor={() => 'rgba(255,255,255,0.7)'}
         labelResolution={2}
+
         htmlElementsData={clickedLocation ? [clickedLocation] : []}
         htmlLat="lat"
         htmlLng="lon"
@@ -268,8 +328,62 @@ export default function ClimateProfile({ spatialData, meta, variable, onVariable
         </div>
       )}
 
-      {/* Loading Overlay */}
-      {loading && (
+      {/* Story Mode Overlay */}
+      {isStoryMode && tourStops && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 w-[450px] bg-black/80 backdrop-blur-xl border border-white/10 p-6 rounded-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.8)] flex flex-col gap-4">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[10px] uppercase font-black tracking-widest text-blue-400">
+              Guided Tour • {tourStepIdx + 1} / {tourStops.length}
+            </span>
+            <button onClick={() => setAppActiveTab('profile')} className="p-1 hover:bg-white/10 rounded-full text-white/50 hover:text-white transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+          
+          <h3 className="text-xl font-black text-white font-outfit leading-tight">
+            {tourStops[tourStepIdx].title}
+          </h3>
+          
+          <p className="text-sm text-white/80 leading-relaxed min-h-[60px]">
+            {tourStops[tourStepIdx].description}
+          </p>
+          
+          <div className="flex justify-between mt-3 pt-4 border-t border-white/10">
+            <button 
+              disabled={tourStepIdx === 0}
+              onClick={() => {
+                const prev = tourStepIdx - 1;
+                setTourStepIdx(prev);
+                jumpToStop(tourStops[prev]);
+              }}
+              className="px-4 py-2.5 text-xs font-bold text-white/60 hover:text-white disabled:opacity-30 transition-colors"
+            >
+              Previous Stop
+            </button>
+            <button 
+              disabled={tourStepIdx === tourStops.length - 1}
+              onClick={() => {
+                const nxt = tourStepIdx + 1;
+                setTourStepIdx(nxt);
+                jumpToStop(tourStops[nxt]);
+              }}
+              className="px-6 py-2.5 text-xs font-bold bg-blue-500 hover:bg-blue-400 text-white rounded-xl shadow-lg shadow-blue-500/20 disabled:opacity-30 disabled:shadow-none transition-all"
+            >
+              Next Stop
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Overlays */}
+      {isStoryMode && isTourLoading && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-black/80 backdrop-blur-xl border border-white/10 p-6 rounded-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.8)] flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-bold text-white/70 font-outfit">Calculating Anomalies...</span>
+        </div>
+      )}
+
+      {loading && !isStoryMode && (
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
         </div>
