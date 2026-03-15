@@ -4,7 +4,6 @@ MAUSAM (Meteorological Analysis & Universal Spatial Anomaly Mapper) Explorer is 
 
 Features a custom-built 1990–2024 High-Fidelity Synthetic Climate Generator for immediate exploration without needing to download massive raw datasets.
 
-![MAUSAM Explorer](https://github.com/user-attachments/assets/placeholder-image) <!-- Add a screenshot here -->
 
 ## ✨ Key Features
 
