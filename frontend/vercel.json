@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://mausam-explorer-2.onrender.com"
+      "destination": "https://mausam-explorer-2.onrender.com/api/$1"
     }
   ]
 }
