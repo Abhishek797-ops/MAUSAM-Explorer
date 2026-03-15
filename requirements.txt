@@ -7,4 +7,4 @@ pandas
 pydantic
 python-dotenv
 google-generativeai
-matplotlib<3.9.0
+matplotlib
