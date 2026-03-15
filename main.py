@@ -26,10 +26,10 @@ app = FastAPI(
     default_response_class=ORJSONResponse
 )
 
-# Enable CORS for the local Vite React server
+# Enable CORS for the cloud frontend (Vercel/Netlify) and local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["*"],  # Allow all origins so Vercel can connect
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
